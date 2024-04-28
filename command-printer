@@ -1,0 +1,244 @@
+#!/usr/bin/env bash
+
+if [ "$0" = "${BASH_SOURCE[0]}" ]; then
+  cat <<EOF >&2
+This script can't be run like a normal script. It must be sourced from another
+script.
+
+Usage:
+  Include anywhere in a script to start printing each command being executed.
+  Activate like this:
+    . command-printer
+    activate_command_printer [OPTIONS]..
+
+Options to activate_command_printer function:
+  --long-command-threshold-seconds <int>:
+    The threshold for how long a command should run in order to be considered
+    long running. Long running commands will be printed in the final report when
+    the script completes along with the time it took to run it.
+
+  --no-report:
+    Don't print any report about long running commands when the script completes
+
+Exiting..
+EOF
+  exit 1
+fi
+
+# Colors
+C_LINE_NO='\033[0;34;1m'
+C_COMMAND='\033[0;32;1m'
+C_MULTI='\033[0;33;1m'
+C_EXPAND='\033[0;32m'
+C_TIME='\033[0;35;1m'
+C_SUCCESS='\033[0;32;1m'
+C_FAILURE='\033[0;31;1m'
+C_INFO='\033[0;37;1m'
+C_HIGHLIGHT='\033[0;34;1m'
+C_NO_C='\033[0m'
+
+long_running_commands=()
+
+activate_command_printer() {
+  end_report='true'
+  print_script_result='true'
+  long_command_time_threshold=5
+  while :; do
+    case "${1-}" in
+      --no-report)
+        end_report='false'
+        ;;
+      --long-command-threshold-seconds)
+        long_command_time_threshold="${2-}"
+        shift
+        ;;
+      -?*)
+        echo "Unknown option: $1" >&2
+        exit 1
+        ;;
+      *)
+        break
+        ;;
+    esac
+    shift
+  done
+
+  # Pass LINENO and BASH_SOURCE as variables or they
+  # will evaluate to wrong values
+  trap 'exit_command' EXIT
+  trap 'command_printer "${LINENO}" "$BASH_SOURCE"' DEBUG
+}
+
+get_current_timemillis() {
+  date +%s%3N
+}
+
+seconds_to_human() {
+  secs=$1
+  printf '%02dh:%02dm:%02ds\n' $((secs/3600)) $((secs%3600/60)) $((secs%60))
+}
+
+print_final_time() {
+  current_time="$(get_current_timemillis)"
+  seconds_since_last_prompt=$(((current_time - last_time) / 1000))
+  seconds_since_start=$(((current_time - START_TIME) / 1000))
+  since_start=$(seconds_to_human ${seconds_since_start})
+  since_last_prompt=$(seconds_to_human $seconds_since_last_prompt)
+  if [ $seconds_since_last_prompt -gt 0 ]; then
+    echo -e "${C_TIME}Time since last prompt: $since_last_prompt${C_NO_C}"
+    if [ "$seconds_since_last_prompt" -ge "$long_command_time_threshold" ]; then
+      long_running_commands+=("${seconds_since_last_prompt}:$last_command")
+    fi
+  fi
+  echo -e "${C_TIME}Time since start:       $since_start${C_NO_C}"
+}
+
+print_report() {
+  if [ ${#long_running_commands[@]} -gt 0 ]; then
+    long_running_commands_with_time=()
+    for long_running_command in "${long_running_commands[@]}"; do
+      IFS=':' read -r time_in_seconds command <<< "$long_running_command"
+      percent="$((time_in_seconds * 100 / seconds_since_start))"
+      percent_string="(~${percent} %)"
+      padded_percent_string=$(printf '%-7s' "$percent_string")
+      human_time=$(seconds_to_human "$time_in_seconds")
+      long_running_commands_with_time+=("${C_TIME}${human_time}${C_INFO} ${padded_percent_string}: $command")
+    done
+
+    echo -e "\n${C_INFO}+--- Commands in script running for longer than ${C_HIGHLIGHT}$long_command_time_threshold${C_INFO} seconds (sorted by running time)${C_NO_C}"
+    #https://stackoverflow.com/questions/7442417/how-to-sort-an-array-in-bash
+    IFS=$'\n' sorted=($(sort -r <<<"${long_running_commands_with_time[*]}")); unset IFS
+    for long_running_command in "${sorted[@]}"; do
+      echo -e "${C_INFO}| $long_running_command"
+    done
+    #${seconds_since_start}
+    echo -e "${C_INFO}| Total running time: ${C_TIME}${since_start}${C_NO_C}"
+    echo -e "${C_INFO}+-----${C_NO_C}"
+  else
+    echo -e "\n${C_INFO}No command ran for longer than ${C_HIGHLIGHT}$long_command_time_threshold${C_INFO} seconds${C_NO_C}"
+  fi
+}
+
+exit_command() {
+  script_res="$?"
+  print_final_time
+  if [ "$end_report" == 'true' ]; then
+    print_report
+  fi
+  if [ "$print_script_result" == 'true' ]; then
+    if [ "$script_res" == '0' ]; then
+      echo -e "${C_INFO}The script completed ${C_SUCCESS}successfully${C_NO_C}"
+    else
+      echo -e "${C_INFO}The script ${C_FAILURE}failed${C_INFO} with error code ${C_FAILURE}${script_res}${C_NO_C}"
+    fi
+  fi
+}
+
+command_printer() {
+  ln=$1
+  bash_source=$2
+
+  # When running with EXIT trap the command_printer is called with line number 1
+  # for some reason. Ignore the call if line number was 1
+  if [ "$ln" = 1 ]; then
+    return
+  fi
+
+  current_time="$(get_current_timemillis)"
+  if [ -z ${START_TIME+x} ]; then
+    START_TIME="$current_time"
+    echo -e "${C_INFO}COMMAND PRINTER STARTED${C_NO_C}"
+    seconds_since_last_prompt=0
+  else
+    seconds_since_last_prompt=$(((current_time - last_time) / 1000))
+    since_start=$(seconds_to_human $(((current_time - START_TIME) / 1000)))
+    since_last_prompt=$(seconds_to_human $seconds_since_last_prompt)
+  fi
+  last_time="$current_time"
+
+  # Extract the line as it looks like in the script file.
+  # $BASH_COMMAND only contains the part that is actually
+  # executed (problematic for e.g. if statements)
+  script_line=$(sed "${ln}q;d" "${bash_source}" | sed -r "s/^\s*//;s/\s*$//")
+
+  # Read following lines if the command is split on multiple lines (look if current line ends with ||, && or \)
+  next_ln=$ln
+  while [[ "$script_line" =~ (\|\||&&|\\)$ ]]; do
+    next_ln=$((next_ln+1))
+    next_line=$(sed "${next_ln}q;d" "${bash_source}" | sed -r "s/^\s*//;s/\s*$//")
+    script_line="$script_line
+    $next_line"
+  done
+
+  # Read previous lines if the command is split on multiple lines (look if previous line ends with ||, && or \)
+  previous_ln=$((ln-1))
+  previous_line=$(sed "${previous_ln}q;d" "${bash_source}" | sed -r "s/^\s*//;s/\s*$//")
+  while [[ "$previous_line" =~ (\|\||&&|\\)$ ]]; do
+    script_line="$previous_line
+    $script_line"
+    previous_ln=$((previous_ln-1))
+    previous_line=$(sed "${previous_ln}q;d" "${bash_source}" | sed -r "s/^\s*//;s/\s*$//")
+  done
+
+  block_regex='^ *if '
+  multicommand_regex='\|\||&&|;|\|'
+  # The sed command below will remove $'...', '...' and "..." strings (in that order)
+  script_line_without_strings=$(echo "$script_line" | sed -r $'s/\$\'([^\']|\\\\\')*\'//g; s/\'[^\']*\'//g; s/"([^"]|\\")*"//g') #'
+  # Emacs have problems with the syntax highlighting so I had to add "#'" in the end to trick emacs
+
+  # If the line being run starts with if, print the line instead of the command being run
+  if [[ "$script_line" =~ $block_regex ]]; then
+    local multi_cmd="$script_line"
+    cmd="$BASH_COMMAND"
+  # If the line being run contains ||, && or ; we will print both the command and the script line
+  elif [[ "$script_line_without_strings" =~ $multicommand_regex ]]; then
+    local multi_cmd="$script_line"
+    cmd="$BASH_COMMAND"
+  # Only print the command being run
+  else
+    cmd="$BASH_COMMAND"
+  fi
+  if [ $seconds_since_last_prompt -gt 0 ]; then
+    echo -e "${C_TIME}Time since last prompt: $since_last_prompt${C_NO_C}"
+    echo -e "${C_TIME}Time since start:       $since_start${C_NO_C}"
+    if [ "$seconds_since_last_prompt" -ge "$long_command_time_threshold" ]; then
+      # Replace all backslashes followed by newline (and leading and trailing whitespaces around it)
+      # with single space. The final report will have problems sorting the result otherwise
+      last_command=$(echo "$last_command" | sed -r ':a;N;$!ba;s/ *\\\n[\t ]*/ /g')
+      long_running_commands+=("${seconds_since_last_prompt}:$last_command")
+    fi
+  fi
+
+  # Expand the variables in the command
+  # Escape all '\', replace all '$(' with '\$(' and '`' with "\`"(to avoid evaluating command execution), then escape all '"'
+  escaped_cmd=$(echo "$cmd" | sed -r 's/(\\|\$\(|"|`)/\\\1/g')
+  eval_cmd=$(eval "set +u; echo \"$escaped_cmd\"")
+  # Extra info to print if eval_cmd != cmd
+  expanded_cmd="${C_EXPAND}With parameters expanded: $eval_cmd${C_NO_C}"
+
+  echo_regex='^echo|printf '
+  if [[ "$cmd" =~ $echo_regex ]]; then
+    # It's an 'echo' or 'printf' command. Ignore multi_cmd, ignore variable expansions (they will be printed anyway), and escape control characters
+    cmd=$(echo "$cmd" | sed -r 's/\\/\\\\/g')
+    redirect_regex='>'
+    nonvalid_redirect_regex='>&2'
+
+    # The regex will interpret any $ in cmd's value as end of string. We must escape it
+    pipe_regex=$(echo "$cmd \|" | sed -r 's/\$/\\$/g')
+
+    if ! [[ ( "$cmd" =~ $redirect_regex && ! "$cmd" =~ $nonvalid_redirect_regex ) || "$script_line" =~ $pipe_regex ]]; then
+      eval_cmd="$cmd"
+    fi
+  fi
+
+  if [ -z "${multi_cmd:-}" ]; then
+    command_to_print="${C_LINE_NO}line $ln ${C_COMMAND}$ $cmd${C_NO_C}"
+  else
+    command_to_print="${C_LINE_NO}line $ln ${C_COMMAND}$ $cmd${C_MULTI} ($multi_cmd)${C_NO_C}"
+  fi
+  echo -e "${command_to_print}"
+  last_command="${command_to_print}"
+  if [ "$cmd" != "$eval_cmd" ]; then
+    echo -e "$expanded_cmd"
+  fi
+}
