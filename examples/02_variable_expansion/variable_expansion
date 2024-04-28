@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+# These three lines is everything you need to add to your script
+SCRIPT_DIR=$(dirname "$0")
+. "$SCRIPT_DIR/../../command-printer"
+activate_command_printer -r
+
+ls -a "$HOME"
+echo "Variables are not expanded for 'echo': $HOME"
+printf "Nor 'printf': $HOME\n"
