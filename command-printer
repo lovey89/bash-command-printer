@@ -8,16 +8,16 @@ script.
 Usage:
   Include anywhere in a script to start printing each command being executed.
   Activate like this:
-    . command-printer
+    . path/to/command-printer
     activate_command_printer [OPTIONS]..
 
 Options to activate_command_printer function:
-  --long-command-threshold-seconds <int>:
+  -l, --long-command-threshold-seconds <int>:
     The threshold for how long a command should run in order to be considered
     long running. Long running commands will be printed in the final report when
     the script completes along with the time it took to run it.
 
-  --no-report:
+  -r, --no-report:
     Don't print any report about long running commands when the script completes
 
 Exiting..
@@ -45,10 +45,10 @@ activate_command_printer() {
   long_command_time_threshold=5
   while :; do
     case "${1-}" in
-      --no-report)
+      --no-report|-r)
         end_report='false'
         ;;
-      --long-command-threshold-seconds)
+      --long-command-threshold-seconds|-l)
         long_command_time_threshold="${2-}"
         shift
         ;;
