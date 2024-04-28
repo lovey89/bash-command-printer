@@ -107,6 +107,7 @@ print_report() {
 
     echo -e "\n${C_INFO}+--- Commands in script running for longer than ${C_HIGHLIGHT}$long_command_time_threshold${C_INFO} seconds (sorted by running time)${C_NO_C}"
     #https://stackoverflow.com/questions/7442417/how-to-sort-an-array-in-bash
+    # shellcheck disable=SC2207
     IFS=$'\n' sorted=($(sort -r <<<"${long_running_commands_with_time[*]}")); unset IFS
     for long_running_command in "${sorted[@]}"; do
       echo -e "${C_INFO}| $long_running_command"
