@@ -5,6 +5,6 @@ SCRIPT_DIR=$(dirname "$0")
 . "$SCRIPT_DIR/../../command-printer"
 activate_command_printer -r
 
-ls -a "$HOME"
-echo "Variables are not expanded for 'echo': $HOME"
-printf "Nor 'printf': $HOME\n"
+LS_RESULT=$(ls -a  "$PWD")
+LS_RESULT=`ls -a  "$PWD"`
+echo $LS_RESULT

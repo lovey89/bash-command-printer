@@ -5,6 +5,8 @@ SCRIPT_DIR=$(dirname "$0")
 . "$SCRIPT_DIR/../../command-printer"
 activate_command_printer -r
 
-ls -a "$HOME"
-echo "Variables are not expanded for 'echo': $HOME"
-printf "Nor 'printf': $HOME\n"
+i=1
+while [ $i -le 2 ]; do
+  echo $i
+  ((i++))
+done

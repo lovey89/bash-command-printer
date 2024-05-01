@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+# To activate the command printer
+SCRIPT_DIR=$(dirname "$0")
+. "$SCRIPT_DIR/../../command-printer"
+activate_command_printer -r
+
+NUMBER=2
+
+if [ "$NUMBER" = "0" ]; then
+  echo "Number was zero"
+elif [ "$NUMBER" = "1" ]; then
+  echo "Number was one"
+elif [ "$NUMBER" = "2" ]; then
+  echo "Number was two"
+else
+  echo "It was another number"
+fi

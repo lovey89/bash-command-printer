@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+# To activate the command printer
+SCRIPT_DIR=$(dirname "$0")
+. "$SCRIPT_DIR/../../command-printer"
+activate_command_printer -r
+
+# Function declarations are not printed by the command printer
+slow_command() {
+  sleep 4
+}
+
+slower_command() {
+  sleep 5
+}
+
+fast_command() {
+  sleep 2
+}
+
+slow_command
+fast_command
+slower_command
