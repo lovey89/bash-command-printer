@@ -1,6 +1,40 @@
 # bash-command-printer
 A minimal bash script to print each command being run in a bash script
 
+## Getting started
+
+Getting started with the command printer is easy! Just source the
+`command-printer` file and run the `activate_command_printer` function. That's
+it!
+
+```bash
+#!/usr/bin/env bash
+
+# To activate the command printer
+. command-printer
+activate_command_printer
+
+# Your script here
+echo "Hello world"
+```
+
+You can also choose to activate the command printer later in the script if you
+don't care about printing e.g. setup commands:
+
+```bash
+#!/usr/bin/env bash
+
+# To activate the command printer
+. command-printer
+
+# Your setup code
+
+activate_command_printer
+
+# Your script here
+echo "Hello world"
+```
+
 ## Examples
 ### Hello world
 [examples/01_hello_world/hello_world](examples/01_hello_world/hello_world)
