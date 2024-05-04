@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Copyright (c) Love Yregård. All rights reserved.
+# Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
 if [ "$0" = "${BASH_SOURCE[0]}" ]; then
   cat <<EOF >&2
 This script can't be run like a normal script. It must be sourced from another
