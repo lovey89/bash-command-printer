@@ -157,6 +157,13 @@ command_printer() {
   fi
   last_time="$current_time"
 
+  if [ -n "$delayed_for_loop_variable" ]; then
+    echo -e "${delayed_command_to_print}"
+    echo -e "${C_EXPAND}${delayed_for_loop_variable}=${!delayed_for_loop_variable}${C_NO_C}"
+    delayed_command_to_print=""
+    delayed_for_loop_variable=""
+  fi
+
   # Extract the line as it looks like in the script file.
   # $BASH_COMMAND only contains the part that is actually
   # executed (problematic for e.g. if statements)
@@ -237,9 +244,18 @@ command_printer() {
   else
     command_to_print="${C_LINE_NO}line $ln ${C_COMMAND}$ $cmd${C_MULTI} ($multi_cmd)${C_NO_C}"
   fi
-  echo -e "${command_to_print}"
-  last_command="${command_to_print}"
-  if [ "$cmd" != "$eval_cmd" ]; then
-    echo -e "$expanded_cmd"
+
+  for_loop_variable=$(echo -e "$cmd" | sed -rn 's/for[ \t]+([^ \t]*)[ \t]+in.*/\1/p')
+  if [ -n "$for_loop_variable" ]; then
+    # The for loop has not yet executed so we delay the output until next command so we can also
+    # print the iterator variable's value
+    delayed_command_to_print="$command_to_print"
+    delayed_for_loop_variable="$for_loop_variable"
+  else
+    echo -e "${command_to_print}"
+    last_command="${command_to_print}"
+    if [ "$cmd" != "$eval_cmd" ]; then
+      echo -e "$expanded_cmd"
+    fi
   fi
 }
