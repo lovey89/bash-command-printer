@@ -184,7 +184,7 @@ command_printer() {
   block_regex='^ *if '
   multicommand_regex='\|\||&&|;|\|'
   # The sed command below will remove $'...', '...' and "..." strings (in that order)
-  script_line_without_strings=$(echo "$script_line" | sed -r $'s/\$\'([^\']|\\\\\')*\'//g; s/\'[^\']*\'//g; s/"([^"]|\\")*"//g') #'
+  script_line_without_strings=$(echo "$script_line" | sed -r $'s/\$\'([^\']|\\\\\')*\'//g; s/\'[^\']*\'//g; s/"([^"]|\\\\")*"//g') #'
   # Emacs have problems with the syntax highlighting so I had to add "#'" in the end to trick emacs
 
   # If the line being run starts with if, print the line instead of the command being run
