@@ -18,11 +18,16 @@ Options to activate_command_printer function:
   -l, --long-command-threshold-seconds <int>:
     The threshold for how long a command should run in order to be considered
     long running. Long running commands will be printed in the final report when
-    the script completes along with the time it took to run it.
+    the script completes along with the time it took to run it
 
   -r, --no-report:
     Don't print any report about long running commands when the script completes
 
+  --hide <variable_name>:
+    Don't expand variable /variable_name/. Note that it will only be hidden in
+    the command printer output. If the called command prints it, it will still
+    be visible. This option can be repeated if you want to prevent multiple
+    variables from being expanded
 Exiting..
 EOF
   exit 1
@@ -33,6 +38,7 @@ C_LINE_NO='\033[0;34;1m'
 C_COMMAND='\033[0;32;1m'
 C_MULTI='\033[0;33;1m'
 C_EXPAND='\033[0;32m'
+C_HIDDEN='\033[0;31m'
 C_TIME='\033[0;35;1m'
 C_SUCCESS='\033[0;32;1m'
 C_FAILURE='\033[0;31;1m'
@@ -53,6 +59,14 @@ activate_command_printer() {
         ;;
       --long-command-threshold-seconds|-l)
         long_command_time_threshold="${2-}"
+        shift
+        ;;
+      --hide)
+        if [ -z "$VARS_TO_HIDE" ]; then
+          VARS_TO_HIDE="${2-}"
+        else
+          VARS_TO_HIDE="${VARS_TO_HIDE}|${2-}"
+        fi
         shift
         ;;
       -?*)
@@ -222,8 +236,14 @@ command_printer() {
 
   # Expand the variables in the command
   # Escape all '\', replace all '$(' with '\$(' and '`' with "\`"(to avoid evaluating command execution), then escape all '"'
-  escaped_cmd=$(echo "$cmd" | sed -r 's/(\\|\$\(|"|`)/\\\1/g')
-  eval_cmd=$(eval "set +u; echo \"$escaped_cmd\"")
+  sanitized_cmd=$(echo "$cmd" | sed -r 's/(\\|\$\(|"|`)/\\\1/g')
+
+  if [ -n "$VARS_TO_HIDE" ]; then
+    sanitized_cmd=$(echo "$sanitized_cmd" | sed -r "s/\\$\\{[!#]?(${VARS_TO_HIDE})([:\\*@#%\\/,\\^@[][^\\}]+)?\\}/\${C_HIDDEN}\\\\&\${C_EXPAND}/g")
+    sanitized_cmd=$(echo "$sanitized_cmd" | sed -r "s/(\\\$(${VARS_TO_HIDE}))([^A-Za-z0-9_])/\${C_HIDDEN}\\\\\1\${C_EXPAND}\3/g")
+  fi
+
+  eval_cmd=$(eval "set +u; echo \"$sanitized_cmd\"")
   # Extra info to print if eval_cmd != cmd
   expanded_cmd="${C_EXPAND}With parameters expanded: $eval_cmd${C_NO_C}"
 
