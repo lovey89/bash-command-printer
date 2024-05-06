@@ -28,6 +28,10 @@ Options to activate_command_printer function:
     the command printer output. If the called command prints it, it will still
     be visible. This option can be repeated if you want to prevent multiple
     variables from being expanded
+
+  --hidden-replacement <string>:
+    When using the 'hide' option you can use this option to define what the
+    replacement string of a hidden variable should be
 Exiting..
 EOF
   exit 1
@@ -48,6 +52,11 @@ C_NO_C='\033[0m'
 
 long_running_commands=()
 
+# These are used in a sed substitution and will only escape the variable to be
+# hidden so it's not expanded
+HIDDEN_REPLACEMENT_0="\\\\&"
+HIDDEN_REPLACEMENT_1="\\\\\1"
+
 activate_command_printer() {
   end_report='true'
   print_script_result='true'
@@ -67,6 +76,11 @@ activate_command_printer() {
         else
           VARS_TO_HIDE="${VARS_TO_HIDE}|${2-}"
         fi
+        shift
+        ;;
+      --hidden-replacement)
+        HIDDEN_REPLACEMENT_0="${2-}"
+        HIDDEN_REPLACEMENT_1="${2-}"
         shift
         ;;
       -?*)
@@ -239,8 +253,8 @@ command_printer() {
   sanitized_cmd=$(echo "$cmd" | sed -r 's/(\\|\$\(|"|`)/\\\1/g')
 
   if [ -n "$VARS_TO_HIDE" ]; then
-    sanitized_cmd=$(echo "$sanitized_cmd" | sed -r "s/\\$\\{[!#]?(${VARS_TO_HIDE})([:\\*@#%\\/,\\^@[][^\\}]+)?\\}/\${C_HIDDEN}\\\\&\${C_EXPAND}/g")
-    sanitized_cmd=$(echo "$sanitized_cmd" | sed -r "s/(\\\$(${VARS_TO_HIDE}))([^A-Za-z0-9_])/\${C_HIDDEN}\\\\\1\${C_EXPAND}\3/g")
+    sanitized_cmd=$(echo "$sanitized_cmd" | sed -r "s/\\$\\{[!#]?(${VARS_TO_HIDE})([:\\*@#%\\/,\\^@[][^\\}]+)?\\}/\${C_HIDDEN}${HIDDEN_REPLACEMENT_0}\${C_EXPAND}/g")
+    sanitized_cmd=$(echo "$sanitized_cmd" | sed -r "s/(\\\$(${VARS_TO_HIDE}))([^A-Za-z0-9_])/\${C_HIDDEN}${HIDDEN_REPLACEMENT_1}\${C_EXPAND}\3/g")
   fi
 
   eval_cmd=$(eval "set +u; echo \"$sanitized_cmd\"")
